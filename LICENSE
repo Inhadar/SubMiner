@@ -672,3 +672,18 @@ may consider it more useful to permit linking proprietary applications with
 the library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.  But first, please read
 <https://www.gnu.org/licenses/why-not-lgpl.html>.
+
+
+==============================================================================
+EXCLUSION OF ASSETS / LICENSE SCOPE:
+
+The MIT License above applies ONLY to the source code (.gd, .cs, .shader, etc.) of this project.
+
+All non-code assets—including but not limited to graphics, visual art, 3D models, 
+textures, audio, music, sound effects, UI designs, and narrative content—are 
+EXCLUDED from the MIT License. 
+
+All rights to these non-code assets are reserved (All Rights Reserved). They may 
+not be copied, modified, redistributed, or used in other projects without express 
+written permission from the copyright holder.
+==============================================================================
