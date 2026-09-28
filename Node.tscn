@@ -1,0 +1,279 @@
+[gd_scene load_steps=20 format=2]
+
+[ext_resource path="res://tile_set.tres" type="TileSet" id=1]
+[ext_resource path="res://Sprite-0001.png" type="Texture" id=2]
+[ext_resource path="res://Sprite.gd" type="Script" id=3]
+[ext_resource path="res://water_diffuse.png" type="Texture" id=4]
+[ext_resource path="res://Node.gd" type="Script" id=5]
+[ext_resource path="res://Subminer.tscn" type="PackedScene" id=6]
+[ext_resource path="res://TileMap.gd" type="Script" id=7]
+[ext_resource path="res://light (1).png" type="Texture" id=8]
+[ext_resource path="res://PNG/environment/background.png" type="Texture" id=9]
+[ext_resource path="res://Control.tscn" type="PackedScene" id=10]
+[ext_resource path="res://PNG/environment/midground.png" type="Texture" id=11]
+
+[sub_resource type="RectangleShape2D" id=1]
+extents = Vector2( 1184, 19.3486 )
+
+[sub_resource type="Animation" id=2]
+resource_name = "sun"
+length = 30.0
+loop = true
+tracks/0/type = "value"
+tracks/0/path = NodePath("Sprite-0001:rotation_degrees")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/keys = {
+"times": PoolRealArray( 0, 30 ),
+"transitions": PoolRealArray( 1, 1 ),
+"update": 0,
+"values": [ 45.0, 405.0 ]
+}
+
+[sub_resource type="Shader" id=3]
+code = "shader_type canvas_item;
+
+uniform float tile_factor = 10.0;
+uniform float aspect_ratio = 0.5;
+
+uniform vec2 time_factor = vec2(2.0, 3.0);
+uniform vec2 offset_factor = vec2(5.0, 2.0);
+uniform vec2 amplitude = vec2(0.05, 0.05);
+
+vec2 calculate_wave_uv_offset(in float time, vec2 source_uvs, vec2 time_multiplier, vec2 waves_scale) {
+	return vec2(
+		sin(time * time_multiplier.x + (source_uvs.x + source_uvs.y) * waves_scale.x),
+		cos(time * time_multiplier.y + (source_uvs.x + source_uvs.y) * waves_scale.y)
+	);
+}
+
+void fragment() {
+	vec2 tiled_uvs = UV * tile_factor;
+	tiled_uvs.y *= aspect_ratio;
+	
+	vec2 wave_uv_offset = calculate_wave_uv_offset(TIME, tiled_uvs, time_factor, offset_factor);
+	
+	COLOR = texture(TEXTURE, tiled_uvs + wave_uv_offset * amplitude);
+//	COLOR = vec4(wave_uv_offset, 0.0, 1.0);
+}
+"
+
+[sub_resource type="ShaderMaterial" id=4]
+shader = SubResource( 3 )
+shader_param/tile_factor = 10.0
+shader_param/aspect_ratio = 1.7827
+shader_param/time_factor = Vector2( 2, 3 )
+shader_param/offset_factor = Vector2( 5, 2 )
+shader_param/amplitude = Vector2( 0.05, 0.05 )
+
+[sub_resource type="Shader" id=5]
+code = "shader_type canvas_item;
+
+// Gonkee's water shader for Godot 3 - full tutorial https://youtu.be/uhMAHpV_cDg
+// If you use this shader, I would prefer if you gave credit to me and my channel
+
+uniform vec4 blue_tint : hint_color;
+
+uniform vec2 sprite_scale;
+uniform float scale_x = 0.67;
+
+float rand(vec2 coord){
+	return fract(sin(dot(coord, vec2(12.9898, 78.233)))* 43758.5453123);
+}
+
+float noise(vec2 coord){
+	vec2 i = floor(coord);
+	vec2 f = fract(coord);
+
+	// 4 corners of a rectangle surrounding our point
+	float a = rand(i);
+	float b = rand(i + vec2(1.0, 0.0));
+	float c = rand(i + vec2(0.0, 1.0));
+	float d = rand(i + vec2(1.0, 1.0));
+
+	vec2 cubic = f * f * (3.0 - 2.0 * f);
+
+	return mix(a, b, cubic.x) + (c - a) * cubic.y * (1.0 - cubic.x) + (d - b) * cubic.x * cubic.y;
+}
+
+void fragment(){
+	
+	vec2 noisecoord1 = UV * sprite_scale * scale_x;
+	vec2 noisecoord2 = UV * sprite_scale * scale_x + 4.0;
+	
+	vec2 motion1 = vec2(TIME * 0.3, TIME * -0.4);
+	vec2 motion2 = vec2(TIME * 0.1, TIME * 0.5);
+	
+	vec2 distort1 = vec2(noise(noisecoord1 + motion1), noise(noisecoord2 + motion1)) - vec2(0.5);
+	vec2 distort2 = vec2(noise(noisecoord1 + motion2), noise(noisecoord2 + motion2)) - vec2(0.5);
+	
+	vec2 distort_sum = (distort1 + distort2) / 60.0;
+	
+	vec4 color = textureLod(SCREEN_TEXTURE, SCREEN_UV + distort_sum, 0.0);
+	
+	color = mix(color, blue_tint, 0.3);
+	color.rgb = mix(vec3(0.5), color.rgb, 1.4);
+	
+	float near_top = (UV.y + distort_sum.y) / (0.2 / sprite_scale.y);
+	near_top = clamp(near_top, 0.0, 1.0);
+	near_top = 1.0 - near_top;
+	
+	color = mix(color, vec4(1.0), near_top);
+	
+	float edge_lower = 0.6;
+	float edge_upper = edge_lower + 0.1;
+	
+	if(near_top > edge_lower){
+		color.a = 0.0;
+		
+		if(near_top < edge_upper){
+			color.a = (edge_upper - near_top) / (edge_upper - edge_lower);
+		}
+	}
+	
+	COLOR = color;
+}"
+
+[sub_resource type="ShaderMaterial" id=6]
+shader = SubResource( 5 )
+shader_param/blue_tint = Color( 0, 1, 1, 1 )
+shader_param/sprite_scale = Vector2( 3, 3 )
+shader_param/scale_x = 0.1
+
+[sub_resource type="OpenSimplexNoise" id=7]
+octaves = 1
+period = 111.4
+persistence = 1.0
+lacunarity = 4.0
+
+[sub_resource type="NoiseTexture" id=8]
+noise = SubResource( 7 )
+
+[node name="main" type="Node"]
+script = ExtResource( 5 )
+
+[node name="Gorunmez divar" type="StaticBody2D" parent="."]
+visible = false
+position = Vector2( 480, 128 )
+__meta__ = {
+"_edit_group_": true
+}
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Gorunmez divar"]
+shape = SubResource( 1 )
+
+[node name="ColorRect" type="ColorRect" parent="."]
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = -3.05176e-05
+margin_top = -1.52588e-05
+color = Color( 0.921569, 0.109804, 0, 1 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="Sprite-0001" type="Sprite" parent="ColorRect"]
+modulate = Color( 0.980392, 1, 0.396078, 1 )
+position = Vector2( 544.56, 174 )
+rotation = 0.785398
+scale = Vector2( 0.21103, 0.348444 )
+texture = ExtResource( 2 )
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="ColorRect"]
+anims/sun = SubResource( 2 )
+
+[node name="water" type="Sprite" parent="ColorRect"]
+visible = false
+material = SubResource( 4 )
+position = Vector2( -37.4298, 174 )
+scale = Vector2( 4.22266, 7.52773 )
+texture = ExtResource( 4 )
+centered = false
+script = ExtResource( 3 )
+
+[node name="water3" type="TextureRect" parent="."]
+visible = false
+material = SubResource( 6 )
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 8.0
+margin_top = -320.0
+margin_right = -728.0
+margin_bottom = -664.0
+rect_scale = Vector2( 5, 5 )
+texture = ExtResource( 9 )
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="TileMap" type="TileMap" parent="."]
+tile_set = ExtResource( 1 )
+cell_size = Vector2( 32, 32 )
+cell_custom_transform = Transform2D( 32, 0, 0, 32, 0, 0 )
+collision_layer = 2147483649
+format = 1
+script = ExtResource( 7 )
+
+[node name="Subminer" parent="." instance=ExtResource( 6 )]
+position = Vector2( 352, 224 )
+collision_mask = 2147483650
+
+[node name="Position2D" type="Position2D" parent="Subminer"]
+position = Vector2( 0, 33.6842 )
+
+[node name="Camera2D" type="Camera2D" parent="Subminer"]
+current = true
+limit_left = 0
+limit_top = 0
+limit_smoothed = true
+
+[node name="Light2D" type="Light2D" parent="Subminer"]
+position = Vector2( 2.86102e-06, 0 )
+texture = ExtResource( 8 )
+energy = 1.01
+shadow_color = Color( 0, 0, 0, 1 )
+
+[node name="ParallaxBackground" type="ParallaxBackground" parent="Subminer"]
+
+[node name="ParallaxLayer" type="ParallaxLayer" parent="Subminer/ParallaxBackground"]
+motion_scale = Vector2( 0.1, 0.1 )
+motion_mirroring = Vector2( 1000, 1000 )
+
+[node name="Sprite" type="Sprite" parent="Subminer/ParallaxBackground/ParallaxLayer"]
+position = Vector2( 571.5, 500 )
+scale = Vector2( 3.96875, 3.96875 )
+texture = ExtResource( 9 )
+offset = Vector2( 0, -60 )
+
+[node name="ParallaxLayer2" type="ParallaxLayer" parent="Subminer/ParallaxBackground"]
+motion_scale = Vector2( 0.5, 0.5 )
+motion_mirroring = Vector2( 1750, 950 )
+
+[node name="Sprite" type="Sprite" parent="Subminer/ParallaxBackground/ParallaxLayer2"]
+position = Vector2( 888, 472 )
+scale = Vector2( 1.85938, 1.85938 )
+texture = ExtResource( 11 )
+
+[node name="Contoll" parent="." instance=ExtResource( 10 )]
+
+[node name="Sprite" type="Sprite" parent="."]
+position = Vector2( -288, -280 )
+texture = SubResource( 8 )
+
+[node name="data" type="Label" parent="."]
+margin_right = 40.0
+margin_bottom = 14.0
+__meta__ = {
+"_edit_use_anchors_": false
+}
+
+[node name="CanvasModulate" type="CanvasModulate" parent="."]
+position = Vector2( -3.05176e-05, -1.52588e-05 )
+color = Color( 0, 0, 0, 1 )
+
+[node name="Spawn_timer" type="Timer" parent="."]
+one_shot = true
+[connection signal="item_rect_changed" from="ColorRect/water" to="ColorRect/water" method="_on_item_rect_changed"]
